@@ -1,0 +1,16 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+python-docx==1.1.0
+PyPDF2==3.0.1
+pdfplumber==0.10.3
+google-genai==0.2.2
+sqlalchemy==2.0.23
+pydantic==2.5.0
+python-multipart==0.0.6
+exa-py==1.0.9
+python-dotenv==1.0.0
+numpy==1.26.2
+scipy==1.11.4
+aiosqlite==0.19.0
+markdown==3.5.1
+pyyaml==6.0.1
