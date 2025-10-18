@@ -2,39 +2,146 @@
 
 An AI-powered legal document templating system that converts legal documents into reusable templates and generates new drafts through intelligent Q&A.
 
-**Built with:** Python FastAPI + Next.js + Gemini AI + SQLite
+**Built with:** Python FastAPI + Next.js + Gemini AI + SQLite + Exa.ai (Bonus)
 
 ---
 
-## 🎯 Features
+## 🎯 What This Does
 
-- **Document Upload & Parsing**: Upload DOCX/PDF legal documents and extract text automatically
-- **AI Variable Extraction**: Use Gemini AI to identify and extract reusable variables from documents
-- **Template Generation**: Create Markdown templates with YAML front-matter and variable placeholders
-- **Smart Template Matching**: Find the best matching template using embeddings and AI classification
-- **Conversational Drafting**: Generate new documents through an intelligent Q&A chat interface
-- **Pre-fill Variables**: Automatically extract values from user queries
-- **Web Bootstrap (BONUS)**: Search and fetch similar documents from the web using exa.ai when no local template exists
-- **Draft Management**: Copy, download (.md and .docx), and manage generated drafts
-- **Variable Deduplication**: Intelligent deduplication across document chunks
-- **Human-Friendly Questions**: Converts raw variable names to conversational questions
+1. **Upload & Templatize** - Drag a legal DOCX/PDF → AI extracts reusable variables → saves as Markdown template
+2. **Draft via Chat** - Type a request → finds best template → asks questions → generates final document
+3. **Web Bootstrap (Bonus)** - No local template? Search web → auto-create template → continue drafting
 
 ---
 
-## 📐 Architecture
+## 📐 Architecture Overview
 
-**Simple Flow:**
+### High-Level Flow
 
-1. **Upload** → DOCX/PDF → Gemini extracts variables → Template created (Markdown + YAML)
-2. **Draft** → User query → Embeddings match template → Questions asked → Draft generated
-3. **Web Bootstrap** (Bonus) → No local match → Exa searches web → Create template from web → Draft
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    USER INTERACTIONS                         │
+├─────────────────┬──────────────────────┬────────────────────┤
+│   Upload Page   │    Chat/Draft Page   │  Templates Page    │
+│  (Ingest Flow)  │ (Drafting Flow)      │  (Manage Flows)    │
+└────────┬────────┴──────────┬───────────┴────────────┬───────┘
+         │                   │                        │
+    ┌────▼────┐         ┌────▼────┐          ┌───────▼──────┐
+    │ UPLOAD  │         │ TEMPLATE │          │ USE TEMPLATE │
+    │ Extract │         │ MATCHING │          │ or SEARCH    │
+    │ Variables│        │ (Vector  │          │              │
+    │         │        │ + LLM)   │          └──────┬───────┘
+    └────┬────┘        └────┬─────┘                 │
+         │                  │◄────────────────────────┘
+         │                  │
+    ┌────▼──────────────────▼──────────────────┐
+    │         GEMINI AI (Multi-Purpose)        │
+    ├──────────────────────────────────────────┤
+    │ • Extract Variables from Documents       │
+    │ • Classify Best Template Match           │
+    │ • Generate Human-Friendly Questions      │
+    │ • Pre-fill Variables from User Query     │
+    │ • Extract Templates from Web Content     │
+    └────┬──────────────────┬─────────────────┘
+         │                  │
+    ┌────▼────┐        ┌────▼────────────────┐
+    │DATABASE  │        │ VECTOR EMBEDDINGS   │
+    │(SQLite)  │        │(Cosine Similarity)  │
+    │          │        │                     │
+    │Templates │        │Find Similar Docs    │
+    │Variables │        │for Retrieval        │
+    │Documents │        │                     │
+    │Instances │        │                     │
+    └──────────┘        └─────────────────────┘
+         ▲
+         │
+    ┌────┴─────────────────────────────────────┐
+    │  Optional: WEB BOOTSTRAP (Bonus)         │
+    │  ┌──────────────────────────────────┐    │
+    │  │ Exa.ai Search                    │    │
+    │  │ (When no local template found)   │    │
+    │  │                                  │    │
+    │  │ Search → Fetch → Clean → Extract │    │
+    │  │ Variables → Create Template      │    │
+    │  └──────────────────────────────────┘    │
+    └─────────────────────────────────────────┘
+```
 
-**Stack:**
-- Frontend: Next.js + TypeScript + Tailwind CSS
-- Backend: FastAPI + Python
-- LLM: Gemini API (google-genai SDK)
-- Database: SQLite with templates, variables, documents, instances
-- Search (Bonus): exa.ai for web document retrieval
+### Three Core Flows
+
+**FLOW 1: INGEST & TEMPLATIZE**
+```
+User uploads DOCX/PDF
+        ↓
+Extract clean text (parser)
+        ↓
+Gemini: Identify reusable variables
+        ↓
+Return JSON: {key, label, description, example, required, dtype, regex, enum}
+        ↓
+Build Markdown with {{variable}} placeholders
+        ↓
+Store: templates + template_variables tables
+        ↓
+Generate embedding for retrieval
+```
+
+**FLOW 2: TEMPLATE MATCHING & DRAFTING**
+```
+User: "Draft a notice to insurer for motor accident in India"
+        ↓
+Generate embedding of user query
+        ↓
+Vector search: Find top 3 candidate templates (cosine similarity)
+        ↓
+Gemini classifier: "Which is best match? Return confidence + justification"
+        ↓
+If confidence < 0.6 → trigger Web Bootstrap (bonus)
+        ↓
+Show Template Match Card: best + alternatives
+        ↓
+For missing variables: Generate human-friendly questions
+        ↓
+User answers questions
+        ↓
+Variable substitution: {{variable}} → actual value
+        ↓
+Render final Markdown draft
+        ↓
+User: Copy / Download .md / Download .docx / Edit & Regenerate
+```
+
+**FLOW 3: WEB BOOTSTRAP (BONUS)**
+```
+No local template match found
+        ↓
+Exa.ai search: "sample [doc_type] [jurisdiction] [example query]"
+        ↓
+Fetch top results (title, URL, text content, highlights)
+        ↓
+Gemini: Extract actual template from web content (remove FAQ/SEO)
+        ↓
+Run same templatization as FLOW 1
+        ↓
+Store new template in DB
+        ↓
+Continue with FLOW 2 (drafting)
+```
+
+---
+
+## 🔌 Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | Next.js 15 + TypeScript + Tailwind CSS + shadcn/ui | Modern UI, responsive design |
+| **Backend** | FastAPI + Python 3.10+ | High-performance async API |
+| **LLM** | Gemini (google-genai SDK) | Variable extraction, classification, question generation |
+| **Database** | SQLite | Store templates, variables, documents, instances |
+| **Vector Search** | Python embeddings + cosine similarity | Find similar templates |
+| **Web Retrieval** | Exa.ai SDK | Bootstrap templates from web (bonus) |
+| **Document Parsing** | python-docx + pdfplumber | Extract text from DOCX/PDF |
+| **Export** | python-docx | Generate downloadable DOCX files |
 
 ---
 
@@ -43,12 +150,20 @@ An AI-powered legal document templating system that converts legal documents int
 ### Backend Setup
 
 1. **Install Python 3.10+**
+   ```bash
+   python --version
+   ```
 
 2. **Create virtual environment:**
    ```bash
    cd backend
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   
+   # On Windows:
+   venv\Scripts\activate
+   
+   # On macOS/Linux:
+   source venv/bin/activate
    ```
 
 3. **Install dependencies:**
@@ -56,25 +171,39 @@ An AI-powered legal document templating system that converts legal documents int
    pip install -r requirements.txt
    ```
 
-4. **Configure environment (backend/.env):**
+4. **Create `.env` file (backend/.env):**
    ```bash
-   GEMINI_API_KEY=your_key_from_aistudio.google.com
-   EXA_API_KEY=your_key_from_dashboard.exa.ai  # Optional for web bootstrap
+   # REQUIRED - Get from https://aistudio.google.com/app/apikey
+   GEMINI_API_KEY=AIzaSy...YOUR_KEY_HERE...
+
+   # OPTIONAL - Get from https://dashboard.exa.ai (for Web Bootstrap bonus)
+   EXA_API_KEY=your_exa_key_here
+
+   # Configuration
    DATABASE_URL=sqlite:///./legal_templates.db
    MAX_FILE_SIZE_MB=10
    CONFIDENCE_THRESHOLD=0.6
+   
+   # Model settings
+   GEMINI_MODEL=gemini-2.0-flash-exp
+   GEMINI_EMBEDDING_MODEL=text-embedding-004
    ```
 
-5. **Run server:**
+5. **Database auto-creates on first run:**
    ```bash
    python main.py
    ```
+   This starts the FastAPI server and creates tables automatically.
+
    API: http://localhost:8000
    Swagger UI: http://localhost:8000/docs
 
 ### Frontend Setup
 
 1. **Install Node.js 18+**
+   ```bash
+   node --version
+   ```
 
 2. **Install dependencies:**
    ```bash
@@ -82,12 +211,12 @@ An AI-powered legal document templating system that converts legal documents int
    npm install
    ```
 
-3. **Configure environment (frontend/.env.local):**
+3. **Create `.env.local` file (frontend/.env.local):**
    ```bash
    NEXT_PUBLIC_API_URL=http://localhost:8000
    ```
 
-4. **Run dev server:**
+4. **Start dev server:**
    ```bash
    npm run dev
    ```
@@ -95,33 +224,387 @@ An AI-powered legal document templating system that converts legal documents int
 
 ---
 
-## 📖 Usage
+## 🧠 Smart Prompting Examples
+
+### 1. Variable Extraction (Gemini)
+
+**System Prompt:**
+```
+You are a legal document templating assistant. Your task is to identify reusable fields 
+(variables) in legal documents that can be replaced when generating new drafts.
+
+Rules:
+1. Return ONLY valid JSON, no markdown or explanations
+2. Deduplicate logically identical fields 
+   (e.g., "claimant name" and "claimant_full_name" are the same → use one key)
+3. Use snake_case for keys (e.g., claimant_full_name, not ClaimantFullName)
+4. Favor domain-generic names over specific ones
+   Good: "party_name" (works for lessor, lessee, buyer, seller)
+   Bad:  "plaintiff_name_in_civil_suit" (too specific)
+5. For each variable provide: key, label, description, example, required, dtype, regex, enum_values
+6. Extract similarity_tags (jurisdiction, doc_type, domain keywords)
+7. Do NOT variable-ize statutory text or mandatory legal references
+   • Keep: "...pursuant to Section 498A of IPC, as amended..."
+   • Variable-ize: "The accused is {{accused_name}}"
+8. Focus on party-specific facts: names, dates, amounts, policy numbers, addresses, FIR numbers, etc.
+9. Guardrails:
+   • ISO dates: "2025-07-10" format
+   • Currency: INR, USD (with precision)
+   • IDs: minimal regex for patterns (e.g., policy: ^[A-Z0-9]{8,}$)
+```
+
+**User Prompt (Example):**
+```
+Document text:
+[Insurance Notice to Insurer for Motor Accident]
+
+Dear Sir/Madam,
+I, Rajesh Sahu, the policy holder of motor insurance policy No. 46545464, 
+hereby give you notice of an accident involving my vehicle on 10-July-2025...
+The accident occurred at approximately 04:50 PM when a third party vehicle...
+The estimated repair cost is approximately INR 100,000...
+
+Return JSON in this exact format:
+{
+  "variables": [
+    {
+      "key": "policyholder_name",
+      "label": "Policyholder's Full Name",
+      "description": "Full name of the person who holds the insurance policy",
+      "example": "Rajesh Sahu",
+      "required": true,
+      "dtype": "string",
+      "regex": null,
+      "enum_values": null
+    },
+    {
+      "key": "accident_date",
+      "label": "Date of Accident",
+      "description": "Date when the accident occurred (ISO 8601 format)",
+      "example": "2025-07-10",
+      "required": true,
+      "dtype": "date",
+      "regex": "^\\d{4}-\\d{2}-\\d{2}$",
+      "enum_values": null
+    }
+  ],
+  "similarity_tags": ["insurance", "notice", "india", "motor", "accident", "claim"],
+  "doc_type": "Notice to Insurer",
+  "jurisdiction": "India"
+}
+```
+
+**Key Points:**
+- ✅ Deduplication prevents "claimant_name" and "claimant_full_name" both being extracted
+- ✅ Domain-generic names ensure template reuse across similar document types
+- ✅ Statutory text is NOT variable-ized (legal references stay fixed)
+- ✅ Format guardrails: ISO dates, currency format, ID regex patterns
+
+---
+
+### 2. Template Matching & Classification (Gemini)
+
+**System Prompt:**
+```
+You are a legal template classifier. Given a user's request and candidate templates, 
+identify the best match using semantic understanding.
+
+Rules:
+1. Return ONLY valid JSON
+2. Consider: doc_type, jurisdiction, similarity_tags, and title match
+3. Calculate confidence score (0.0 = no match, 1.0 = perfect match)
+4. If confidence < 0.6, return "none" as best_match_id (triggers Web Bootstrap)
+5. Provide brief justification (1 sentence)
+6. List alternative template IDs in order of relevance
+7. Rationale:
+   - Title match: +0.2
+   - Tags match: +0.15 per tag
+   - Jurisdiction match: +0.15
+   - Similarity score from embeddings: use directly
+```
+
+**User Prompt (Example):**
+```
+User request: "Draft a notice to insurer for motor accident in India"
+
+Candidate templates:
+[
+  {
+    "template_id": "tpl_motor_accident_v1",
+    "title": "Notice to Insurer - Motor Accident",
+    "doc_type": "Notice to Insurer",
+    "jurisdiction": "India",
+    "similarity_tags": ["insurance", "notice", "india", "motor", "accident"],
+    "similarity_score": 0.89
+  },
+  {
+    "template_id": "tpl_notice_general",
+    "title": "General Notice Template",
+    "doc_type": "Notice",
+    "jurisdiction": "India",
+    "similarity_tags": ["notice", "india"],
+    "similarity_score": 0.62
+  }
+]
+
+Return JSON:
+{
+  "best_match_id": "tpl_motor_accident_v1",
+  "confidence": 0.92,
+  "justification": "Perfect match: motor accident notice for India with high semantic similarity",
+  "alternatives": ["tpl_notice_general"]
+}
+```
+
+**Key Points:**
+- ✅ Confidence threshold (0.6) prevents poor matches
+- ✅ Alternatives provided for user choice
+- ✅ Semantic understanding (not just keyword matching)
+
+---
+
+### 3. Question Generation (Gemini)
+
+**System Prompt:**
+```
+You are a conversational assistant that generates human-friendly questions for 
+missing legal document variables.
+
+Rules:
+1. NO raw variable names in questions
+   Bad:  "policy_number?"
+   Bad:  "What is claimant_full_name?"
+2. Use clear, polite, unambiguous language
+3. Include format hints where applicable (dates, currency, IDs)
+4. One question per variable
+5. Return JSON array of questions
+6. Examples:
+   Bad:  "policy_number?"
+   Good: "What is the insurance policy number exactly as it appears on the policy schedule?"
+   
+   Bad:  "accident_date?"
+   Good: "On what date did the accident occur? (YYYY-MM-DD format)"
+   
+   Bad:  "demand_amount_inr?"
+   Good: "What is the total claim amount in Indian Rupees?"
+```
+
+**User Prompt (Example):**
+```
+Missing variables:
+[
+  {
+    "key": "policyholder_name",
+    "label": "Policyholder's Full Name",
+    "description": "Full name of the person who holds the insurance policy",
+    "example": "Rajesh Sahu",
+    "required": true,
+    "dtype": "string"
+  },
+  {
+    "key": "accident_date",
+    "label": "Date of Accident",
+    "description": "Date when the accident occurred (ISO 8601 format)",
+    "example": "2025-07-10",
+    "required": true,
+    "dtype": "date"
+  },
+  {
+    "key": "estimated_damage_amount",
+    "label": "Estimated Damage Amount (INR)",
+    "description": "Total estimated repair cost in Indian Rupees",
+    "example": "100000",
+    "required": false,
+    "dtype": "integer"
+  }
+]
+
+Generate friendly questions. Return JSON:
+{
+  "questions": [
+    {
+      "variable_key": "policyholder_name",
+      "question": "What is the policyholder's full name?",
+      "format_hint": "Example: Rajesh Sahu"
+    },
+    {
+      "variable_key": "accident_date",
+      "question": "On what date did the accident occur?",
+      "format_hint": "Format: YYYY-MM-DD (e.g., 2025-07-10)"
+    },
+    {
+      "variable_key": "estimated_damage_amount",
+      "question": "What is the estimated total damage amount in Indian Rupees?",
+      "format_hint": "Example: 100000"
+    }
+  ]
+}
+```
+
+**Key Points:**
+- ✅ Conversational tone (not robotic)
+- ✅ Format hints guide user input
+- ✅ No raw variable names
+
+---
+
+### 4. Pre-fill Value Extraction (Gemini)
+
+**System Prompt:**
+```
+Extract variable values from the user's query that match template variables.
+
+Rules:
+1. Return ONLY valid JSON
+2. Extract dates, names, amounts, locations, numbers from natural language
+3. If uncertain, return null for that variable
+4. Normalize dates to ISO 8601 format (YYYY-MM-DD)
+5. Keep original casing for names
+6. Preserve currency/units as specified
+```
+
+**User Prompt (Example):**
+```
+User query: "Draft a notice to insurer for Rajesh Sahu's motor accident on July 10, 2025 
+            for policy 46545464 with estimated damage of 100000 rupees"
+
+Template variables:
+[
+  {"key": "policyholder_name", "dtype": "string"},
+  {"key": "accident_date", "dtype": "date"},
+  {"key": "policy_number", "dtype": "string"},
+  {"key": "estimated_damage_amount", "dtype": "integer"}
+]
+
+Extract any values present in the query. Return JSON:
+{
+  "filled_variables": {
+    "policyholder_name": "Rajesh Sahu",
+    "accident_date": "2025-07-10",
+    "policy_number": "46545464",
+    "estimated_damage_amount": "100000"
+  }
+}
+```
+
+**Key Points:**
+- ✅ Pre-fills variables from natural language
+- ✅ Handles date format conversion
+- ✅ Graceful null handling
+
+---
+
+## 📊 Database Schema
+
+```sql
+-- Templates (reusable legal documents)
+CREATE TABLE templates (
+    id TEXT PRIMARY KEY,
+    template_id TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    file_description TEXT,
+    doc_type TEXT,
+    jurisdiction TEXT,
+    similarity_tags JSON,           -- ["insurance", "notice", "india"]
+    body_md TEXT NOT NULL,          -- Markdown with {{variables}}
+    embedding JSON,                 -- Vector for retrieval
+    tracking_code TEXT,             -- UOIONHHC
+    created_at DATETIME,
+    updated_at DATETIME
+);
+
+-- Template Variables (field definitions)
+CREATE TABLE template_variables (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    key TEXT NOT NULL,              -- "policyholder_name"
+    label TEXT NOT NULL,            -- "Policyholder's Full Name"
+    description TEXT,
+    example TEXT,
+    required BOOLEAN DEFAULT FALSE,
+    dtype TEXT,                     -- "string", "date", "integer", "currency"
+    regex TEXT,                     -- "^[A-Z0-9]{8,}$"
+    enum_values JSON,               -- ["Option A", "Option B"]
+    created_at DATETIME
+);
+
+-- Uploaded Documents (for future reference)
+CREATE TABLE documents (
+    id TEXT PRIMARY KEY,
+    filename TEXT,
+    mime_type TEXT,                 -- "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    raw_text TEXT,
+    embedding JSON,
+    tracking_code TEXT,
+    created_at DATETIME
+);
+
+-- Draft Instances (user interactions)
+CREATE TABLE instances (
+    id TEXT PRIMARY KEY,
+    template_id TEXT,
+    user_query TEXT,                -- "Draft a notice to insurer..."
+    answers_json JSON,              -- {"policyholder_name": "Rajesh", "accident_date": "2025-07-10"}
+    draft_md TEXT,                  -- Final rendered Markdown
+    draft_number INTEGER,
+    tracking_code TEXT,
+    created_at DATETIME
+);
+```
+
+---
+
+## 📖 Usage Guide
 
 ### 1. Upload & Create Template
-- Go to Upload page
-- Drag-drop a DOCX/PDF legal document
-- Enter template title
-- Click "Extract Variables"
-- Review extracted variables
-- Click "Save Template"
+
+1. Navigate to **Upload** page (http://localhost:3000/upload)
+2. Drag-drop a legal DOCX/PDF document
+3. Click **"Extract Variables"** → Gemini identifies fields
+4. Review extracted variables (edit if needed)
+5. Enter template title and save
+6. Template stored with ID, tags, and metadata
+
+**Example:** Upload an insurance notice → system extracts policyholder_name, policy_number, accident_date, damage_amount
+
+---
 
 ### 2. Draft via Chat
-- Go to Chat/Draft page
-- Type: `"Draft a notice to insurer for motor accident in India"`
-- System finds best matching template (with alternatives)
-- Answer questions for missing variables
-- Click "Generate Draft"
-- Download as DOCX or Markdown
+
+1. Navigate to **Chat** page (http://localhost:3000/chat)
+2. Type or paste a request:
+   ```
+   "Draft a notice to insurer for a motor accident in India"
+   ```
+3. System finds best matching template (with confidence score)
+4. Shows alternatives if available
+5. Click **"Use This Template"**
+6. Answer questions for any missing variables
+7. Click **"Generate Draft"**
+8. Options:
+   - View Markdown
+   - Download .docx
+   - Edit variables & regenerate
+   - Try alternative templates
+
+---
 
 ### 3. Special Commands
-- `/vars` - See filled/missing variables
-- `/draft [request]` - Explicitly trigger drafting
+
+In chat, type:
+- `/vars` → See current filled/missing variables
+- `/draft [request]` → Explicitly trigger draft generation
+
+---
 
 ### 4. Web Bootstrap (Bonus)
-- If no local template found, system auto-searches web
-- Select a document to bootstrap
-- System creates template automatically
-- Continue with drafting
+
+If no local template matches (confidence < 0.6):
+1. System auto-triggers Exa.ai web search
+2. Shows found documents
+3. Click a result to bootstrap it
+4. System creates template from web content
+5. Proceeds with normal drafting flow
 
 ---
 
@@ -130,55 +613,17 @@ An AI-powered legal document templating system that converts legal documents int
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/upload` | POST | Upload DOCX/PDF document |
-| `/api/extract` | POST | Extract variables from document |
+| `/api/extract` | POST | Extract variables from uploaded file |
 | `/api/templates` | GET | List all templates |
-| `/api/templates` | POST | Save template |
+| `/api/templates/{template_id}` | GET | Get template with variables |
+| `/api/templates` | POST | Save template to database |
 | `/api/draft` | POST | Match template + generate questions |
-| `/api/draft/finalize` | POST | Generate final draft |
-| `/api/draft/{id}/regenerate` | POST | Regenerate draft |
-| `/api/draft/{id}/edit` | POST | Edit variables |
-| `/api/draft/{id}/download/docx` | GET | Download as DOCX |
-| `/api/web/search` | POST | Search web documents (Bonus) |
-| `/api/web/bootstrap` | POST | Create template from web (Bonus) |
-
----
-
-## 🧠 Smart Prompting Examples
-
-### Variable Extraction
-```
-System: "You are a legal doc templating assistant. Identify reusable fields."
-Input: Document text
-Output: JSON with variables, tags, metadata
-```
-
-### Template Matching  
-```
-"Given user ask: 'Draft notice to insurer', 
- return best template_id with confidence (0.0-1.0) and justification.
- If confidence < 0.6, return none."
-```
-
-### Question Generation
-```
-Bad:  "policy_number?"
-Good: "What is the insurance policy number exactly as it appears on the policy schedule?"
-```
-
-### Pre-fill Extraction
-```
-Input: "Draft for Rajesh Sahu on July 10, 2025"
-Output: {policyholder_name: "Rajesh Sahu", accident_date: "2025-07-10"}
-```
-
----
-
-## 🗄️ Database Schema
-
-- **templates**: id, template_id, title, doc_type, jurisdiction, body_md, embedding
-- **template_variables**: id, template_id, key, label, description, example, required, dtype, regex
-- **documents**: id, filename, raw_text, embedding
-- **instances**: id, template_id, user_query, answers_json, draft_md, draft_number
+| `/api/draft/finalize` | POST | Generate final draft with answers |
+| `/api/draft/{id}/regenerate` | POST | Regenerate draft with new answers |
+| `/api/draft/{id}/edit` | POST | Edit variables and regenerate |
+| `/api/draft/{id}/download/docx` | GET | Download draft as DOCX |
+| `/api/web/search` | POST | Search web for templates (Bonus) |
+| `/api/web/bootstrap` | POST | Create template from web content (Bonus) |
 
 ---
 
@@ -186,18 +631,22 @@ Output: {policyholder_name: "Rajesh Sahu", accident_date: "2025-07-10"}
 
 ✅ **Core Features**
 - Document upload (DOCX/PDF) with text extraction
-- AI variable extraction with deduplication
-- Template creation with Markdown + YAML format
-- Smart template matching using embeddings + classification
-- Human-friendly question generation for missing variables
-- Draft generation with variable substitution
+- AI variable extraction with automatic deduplication
+- Template creation with Markdown + YAML front-matter
+- Smart template matching using embeddings + LLM classification
+- Human-friendly question generation
+- Draft generation with full variable substitution
 - DOCX and Markdown export
+- Edit variables and regenerate
 
 ✅ **Bonus Features**
 - Web Bootstrap: Search web for templates when no local match
 - Alternative template suggestions for user selection
 - Automatic template creation from web content
 - Robust, steerable, safe prompts throughout
+
+✅ **Tracking**
+- UOIONHHC code embedded in templates and documents
 
 ---
 
@@ -207,19 +656,67 @@ Output: {policyholder_name: "Rajesh Sahu", accident_date: "2025-07-10"}
 |-------|----------|
 | "GEMINI_API_KEY not configured" | Add key to backend/.env from aistudio.google.com |
 | "Failed to parse DOCX/PDF" | Ensure file is not corrupted or password-protected |
-| "Failed to connect to API" | Check backend running on port 8000 |
+| "Failed to connect to API" | Check backend running on `http://localhost:8000` |
 | "No templates loading" | Upload a document first via Upload page |
+| "Web Bootstrap not working" | Add EXA_API_KEY to backend/.env from dashboard.exa.ai |
+| "Templates not matching" | Increase CONFIDENCE_THRESHOLD in .env or upload more examples |
 
 ---
 
-## ⚡ Tech Stack
+## 📋 Sample Outputs
 
-**Backend:** FastAPI + Python 3.10+ + SQLite + Gemini API (NEW SDK: google-genai)
-**Frontend:** Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui
-**Bonus:** exa.ai for web search + document retrieval
+See `/sample_outputs/` folder for:
+- **Template with front-matter** (Markdown with YAML metadata)
+- **Generated draft** (Markdown + DOCX)
+- **Variables export** (JSON + CSV)
+
+Run extraction script:
+```bash
+cd backend
+python export_sample_outputs.py
+```
+
+This generates all template files with metadata from your database.
 
 ---
 
-**Ready to use! Create .env files, run backend + frontend, and start drafting!**
+## 🚀 Quick Start (5 minutes)
 
-**Tracking Code:** UOIONHHC
+1. **Backend:**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # or venv\Scripts\activate
+   pip install -r requirements.txt
+   # Create .env with GEMINI_API_KEY
+   python main.py
+   ```
+
+2. **Frontend:**
+   ```bash
+   cd frontend
+   npm install
+   # Create .env.local with NEXT_PUBLIC_API_URL
+   npm run dev
+   ```
+
+3. **Use:**
+   - Go to http://localhost:3000
+   - Upload a sample document from `backend/sample_documents/`
+   - Create a template
+   - Go to Chat and draft from the template
+
+---
+
+## 📹 Demo Video
+
+See demo at: [Insert your demo video link here]
+
+Shows:
+- Upload document → extract variables → save template
+- Chat request → template matched → Q&A answered → draft generated
+- Bonus: Web bootstrap for missing templates
+
+---
+
+**Built for Full-Stack Engineers | UOIONHHC Tracking Code**
