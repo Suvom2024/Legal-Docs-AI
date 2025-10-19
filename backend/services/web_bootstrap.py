@@ -173,6 +173,69 @@ Return ONLY valid JSON:
         return template_text
     
     @staticmethod
+    def _convert_field_labels_to_placeholders(template_text: str) -> str:
+        """Convert standalone field labels to {{variable}} placeholders
+        
+        Handles templates that are just form field lists like:
+        Full Name
+        Age
+        Address
+        
+        Converts to:
+        Full Name: {{full_name}}
+        Age: {{age}}
+        Address: {{address}}
+        """
+        import re
+        
+        # Common field label patterns
+        field_patterns = {
+            r'^Full Name$': 'full_name',
+            r'^First Name$': 'first_name',
+            r'^Last Name$': 'last_name',
+            r'^Age$': 'age',
+            r'^Address$': 'address',
+            r'^Email$': 'email',
+            r'^Contact No$': 'contact_number',
+            r'^Phone$': 'phone',
+            r'^Profession$': 'profession',
+            r'^Square Feet$': 'square_feet',
+            r'^Survey Number$': 'survey_number',
+            r'^Agreement From Date$': 'agreement_from_date',
+            r'^Agreement To Date$': 'agreement_to_date',
+            r'^Monthly Rent$': 'monthly_rent',
+            r'^Security Deposit$': 'security_deposit',
+        }
+        
+        lines = template_text.split('\n')
+        processed_lines = []
+        
+        for line in lines:
+            stripped = line.strip()
+            matched = False
+            
+            # Check if line matches a field label pattern
+            for pattern, var_name in field_patterns.items():
+                if re.match(pattern, stripped, re.IGNORECASE):
+                    # Convert to "Label: {{variable}}" format
+                    processed_lines.append(f"{stripped}: {{{{{var_name}}}}}")
+                    matched = True
+                    break
+            
+            if not matched:
+                # Check for generic patterns like "Owner Details", "Tenant Details"
+                if stripped.endswith('Details'):
+                    processed_lines.append(f"\n## {stripped}\n")
+                elif len(stripped) > 0 and len(stripped) < 50 and stripped[0].isupper():
+                    # Looks like a field label - convert to snake_case variable
+                    var_name = re.sub(r'[^a-zA-Z0-9]', '_', stripped).lower().strip('_')
+                    processed_lines.append(f"{stripped}: {{{{{var_name}}}}}")
+                else:
+                    processed_lines.append(line)
+        
+        return '\n'.join(processed_lines)
+    
+    @staticmethod
     def _convert_blanks_to_placeholders(template_text: str) -> str:
         """Convert blank lines (______) to proper {{variable}} placeholders
         
@@ -311,8 +374,12 @@ Extract search terms. Return JSON:
             else:
                 raise ValueError("Content too short after cleaning - no usable template found")
         
-        # CRITICAL: Convert blank lines to proper {{variable}} placeholders
+        # CRITICAL: Convert field labels and blank lines to proper {{variable}} placeholders
         # This ensures web-extracted templates can have variables replaced
+        print(f"DEBUG: Converting field labels to placeholders in extracted template")
+        content = WebBootstrap._convert_field_labels_to_placeholders(content)
+        print(f"DEBUG: Template after field label conversion, preview: {content[:500]}")
+        
         print(f"DEBUG: Converting blank lines to placeholders in extracted template")
         content = WebBootstrap._convert_blanks_to_placeholders(content)
         print(f"DEBUG: Template after blank conversion, preview: {content[:500]}")
