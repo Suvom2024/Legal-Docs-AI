@@ -214,6 +214,11 @@ Return ONLY valid JSON:
             stripped = line.strip()
             matched = False
             
+            # Skip lines that already have {{variable}} placeholders
+            if '{{' in line and '}}' in line:
+                processed_lines.append(line)
+                continue
+            
             # Check if line matches a field label pattern
             for pattern, var_name in field_patterns.items():
                 if re.match(pattern, stripped, re.IGNORECASE):
