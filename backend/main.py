@@ -524,6 +524,8 @@ async def create_draft(
             TemplateVariable.template_id == template.id
         ).all()
         
+        print(f"DEBUG: Found {len(variables)} variables for template {template.template_id}")
+        
         # Convert to dict format
         variable_dicts = [
             {
@@ -537,11 +539,16 @@ async def create_draft(
             for v in variables
         ]
         
+        if len(variable_dicts) > 0:
+            print(f"DEBUG: Variable keys: {[v['key'] for v in variable_dicts[:5]]}")  # Show first 5
+        
         # Extract pre-filled values from query
         pre_filled = question_generator.extract_values_from_query(
             request.user_query or f"Load template: {template.title}",
             variable_dicts
         )
+        
+        print(f"DEBUG: Pre-filled values: {pre_filled}")
         
         # Find missing variables
         missing_vars = [
@@ -549,8 +556,12 @@ async def create_draft(
             if v["key"] not in pre_filled or pre_filled[v["key"]] is None
         ]
         
+        print(f"DEBUG: Missing variables count: {len(missing_vars)}")
+        
         # Generate questions for missing variables
         questions = question_generator.generate_questions(missing_vars)
+        
+        print(f"DEBUG: Generated {len(questions)} questions")
         
         # Create instance
         instance = Instance(
