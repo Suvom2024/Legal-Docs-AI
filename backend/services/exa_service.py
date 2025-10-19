@@ -19,7 +19,7 @@ class ExaService:
     def search_documents(
         self,
         query: str,
-        num_results: int = 3,
+        num_results: int = 5,  # Request more to filter out bad results
         include_domains: Optional[List[str]] = None,
         max_retries: int = 3
     ) -> List[Dict[str, Any]]:
@@ -40,26 +40,32 @@ class ExaService:
             try:
                 # Use Exa-style prompt from documentation
                 # "here is a..." format works best for finding actual content
-                # Try multiple prompt variations for better results
-                prompt_variations = [
-                    f"here is a professional {query} template:",
-                    f"this is a downloadable {query} form:",
-                    f"i need this {query} legal template:",
-                    f"here's a sample {query} document:"
+                exa_prompt = f"here is a complete {query} template with fillable fields"
+                
+                # Exclude template marketplace/listing sites that don't have actual content
+                exclude_domains = [
+                    "smallpdf.com",  # Template listings, not actual templates
+                    "template.net",  # Requires login/download
+                    "jotform.com",   # Form builder, not static templates
+                    "formswift.com", # Requires account
+                    "pandadoc.com",  # Requires account
+                    "templatelab.com", # Mixed quality
                 ]
-                exa_prompt = prompt_variations[0]  # Use first variation
                 
                 search_options = {
                     "num_results": num_results,
                     "use_autoprompt": True,
                     "type": "neural",  # Neural search for semantic understanding
+                    "exclude_domains": exclude_domains,  # Filter out listing sites
                     "text": {
-                        "max_characters": 1000  # Get preview text
+                        "max_characters": 2000  # Get more preview text
                     }
                 }
                 
                 if include_domains:
                     search_options["include_domains"] = include_domains
+                    # Remove exclude_domains if we're specifically including domains
+                    del search_options["exclude_domains"]
                 
                 results = self.client.search_and_contents(
                     exa_prompt,
@@ -73,6 +79,18 @@ class ExaService:
                     text = getattr(result, 'text', '')
                     snippet = text[:200] + "..." if text else "No preview available"
                     
+                    # Skip results that are clearly listing pages (even if not in exclude list)
+                    if any(phrase in text.lower()[:500] for phrase in [
+                        "work on the go",
+                        "download our app",
+                        "sign up for free",
+                        "create an account",
+                        "browse templates",
+                        "template library"
+                    ]):
+                        logger.info(f"Skipping listing page: {result.title}")
+                        continue
+                    
                     formatted_results.append({
                         "id": result.id,
                         "title": result.title,
@@ -82,7 +100,8 @@ class ExaService:
                         "published_date": getattr(result, 'published_date', None)
                     })
                 
-                return formatted_results
+                # Return top 3 after filtering
+                return formatted_results[:3]
                 
             except Exception as e:
                 error_msg = str(e).lower()

@@ -460,9 +460,12 @@ export default function ChatPage() {
         }, 1500)
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Failed to create template from web"
+      
+      // Show error but keep web results for retry
       toast({
-        title: "Bootstrap failed",
-        description: error instanceof Error ? error.message : "Failed to create template from web",
+        title: "Template creation failed",
+        description: "This document didn't work. Try another result below.",
         variant: "destructive",
       })
 
@@ -470,7 +473,7 @@ export default function ChatPage() {
         ...prev,
         {
           role: "assistant",
-          content: `❌ Failed to create template: ${error instanceof Error ? error.message : "Unknown error"}`,
+          content: `❌ Could not create template from "${title}": ${errorMsg}\n\nTry selecting another result below, or upload your template directly.`,
         },
       ])
     }

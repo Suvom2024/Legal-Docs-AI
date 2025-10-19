@@ -99,13 +99,33 @@ Return JSON:
 
         try:
             result = gemini_service.classify_template(system_prompt, user_prompt)
+            
+            # Validate result has required fields
+            if not isinstance(result, dict):
+                raise ValueError(f"Expected dict result, got {type(result)}")
+            
+            # Ensure all required fields exist
+            required_fields = ["best_match_id", "confidence", "justification", "alternatives"]
+            for field in required_fields:
+                if field not in result:
+                    print(f"DEBUG: Missing field '{field}' in classification result: {result}")
+                    raise KeyError(f"Missing field: {field}")
+            
+            # Ensure types are correct
+            if not isinstance(result.get("confidence"), (int, float)):
+                result["confidence"] = float(result.get("confidence", 0.0))
+            
+            if not isinstance(result.get("alternatives"), list):
+                result["alternatives"] = []
+            
             return result
         except Exception as e:
+            print(f"DEBUG: Classification exception: {str(e)}")
             # Fallback to highest similarity
             best_template = candidates[0][0]
             return {
                 "best_match_id": best_template.template_id,
-                "confidence": candidates[0][1],
+                "confidence": float(candidates[0][1]),
                 "justification": f"Selected based on highest similarity score",
                 "alternatives": [t.template_id for t, _ in candidates[1:]]
             }
@@ -121,7 +141,25 @@ Return JSON:
             return None
         
         # Classify best match
-        classification = TemplateMatcher.classify_best_match(query, candidates)
+        try:
+            classification = TemplateMatcher.classify_best_match(query, candidates)
+        except Exception as e:
+            print(f"DEBUG: Classification error: {str(e)}")
+            # Fallback to highest similarity
+            best_template = candidates[0][0]
+            return {
+                "template": best_template,
+                "confidence": candidates[0][1],
+                "justification": f"Selected based on highest similarity score",
+                "alternatives": [
+                    {
+                        "template_id": t.template_id,
+                        "title": t.title,
+                        "doc_type": t.doc_type
+                    }
+                    for t, _ in candidates[1:]
+                ]
+            }
         
         # Check confidence threshold
         if classification["confidence"] < settings.CONFIDENCE_THRESHOLD:
@@ -139,18 +177,23 @@ Return JSON:
         if not best_template:
             return None
         
-        # Get alternatives
+        # Get alternatives - ensure it's a list
         alternatives = []
-        for alt_id in classification.get("alternatives", [])[:2]:
-            alt_template = db.query(Template).filter(
-                Template.template_id == alt_id
-            ).first()
-            if alt_template:
-                alternatives.append({
-                    "template_id": alt_template.template_id,
-                    "title": alt_template.title,
-                    "doc_type": alt_template.doc_type
-                })
+        alt_list = classification.get("alternatives", [])
+        
+        # Handle case where alternatives might be wrapped or malformed
+        if isinstance(alt_list, list):
+            for alt_id in alt_list[:2]:
+                if isinstance(alt_id, str):
+                    alt_template = db.query(Template).filter(
+                        Template.template_id == alt_id
+                    ).first()
+                    if alt_template:
+                        alternatives.append({
+                            "template_id": alt_template.template_id,
+                            "title": alt_template.title,
+                            "doc_type": alt_template.doc_type
+                        })
         
         return {
             "template": best_template,

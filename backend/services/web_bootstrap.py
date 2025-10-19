@@ -56,7 +56,7 @@ INSTRUCTIONS:
 7. Only return "NO_TEMPLATE_FOUND" if there's absolutely no template-like content
 8. Convert all [VARIABLE] patterns to {{variable}} format (snake_case)
 
-Return ONLY the extracted template content, formatted as markdown."""
+CRITICAL: You MUST return valid JSON with a "template" key, even if the content is not ideal."""
 
         user_prompt = f"""Extract the actual legal document template from this web content.
 
@@ -65,19 +65,24 @@ TEMPLATE TITLE: {title}
 WEB CONTENT:
 {raw_content[:8000]}
 
-Extract ONLY the template document, removing all FAQ, SEO, and navigation content."""
+Return ONLY valid JSON:
+{{"template": "<extracted template content here, or empty string if nothing found>"}}"""
 
         try:
             print(f"DEBUG: LLM extraction for template: {title}")
             print(f"DEBUG: Raw content length: {len(raw_content)}")
             print(f"DEBUG: Raw content preview: {raw_content[:500]}")
 
-            result = gemini_service._generate_json_response(
-                system_prompt,
-                user_prompt + "\n\nReturn JSON: {\"template\": \"<extracted template here>\"}"
-            )
-
-            extracted = result.get('template', '').strip()
+            result = gemini_service._generate_json_response(system_prompt, user_prompt)
+            
+            # Handle different response structures
+            if isinstance(result, dict):
+                extracted = result.get('template', '')
+            else:
+                print(f"DEBUG: Unexpected result type: {type(result)}, result: {result}")
+                extracted = ''
+            
+            extracted = extracted.strip() if extracted else ''
             print(f"DEBUG: LLM extracted template length: {len(extracted)}")
             print(f"DEBUG: LLM extracted preview: {extracted[:300] if extracted else 'None'}")
 
@@ -85,8 +90,7 @@ Extract ONLY the template document, removing all FAQ, SEO, and navigation conten
             if not extracted or extracted == "NO_TEMPLATE_FOUND" or len(extracted) < 100:
                 raise ValueError(
                     "Could not extract a valid template from the web content. "
-                    "The page appears to be mostly FAQ/description text with no usable template structure. "
-                    "Please try a different document or upload manually."
+                    "The page appears to be mostly FAQ/description text with no usable template structure."
                 )
 
             # Convert [VARIABLE] patterns to {{variable}} format (fallback if LLM didn't do it)
@@ -99,6 +103,7 @@ Extract ONLY the template document, removing all FAQ, SEO, and navigation conten
             
         except Exception as e:
             # If LLM extraction fails, try with cleaned content
+            print(f"DEBUG: Template extraction error: {str(e)}")
             raise ValueError(f"Template extraction failed: {str(e)}")
 
     @staticmethod

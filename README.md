@@ -175,10 +175,10 @@ Continue with FLOW 2 (drafting)
    ```bash
    # REQUIRED - Get from https://aistudio.google.com/app/apikey
    GEMINI_API_KEY=AIzaSy...YOUR_KEY_HERE...
-
+   
    # OPTIONAL - Get from https://dashboard.exa.ai (for Web Bootstrap bonus)
    EXA_API_KEY=your_exa_key_here
-
+   
    # Configuration
    DATABASE_URL=sqlite:///./legal_templates.db
    MAX_FILE_SIZE_MB=10
@@ -194,7 +194,7 @@ Continue with FLOW 2 (drafting)
    python main.py
    ```
    This starts the FastAPI server and creates tables automatically.
-
+   
    API: http://localhost:8000
    Swagger UI: http://localhost:8000/docs
 

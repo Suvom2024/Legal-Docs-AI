@@ -581,6 +581,9 @@ async def create_draft(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"DEBUG: Draft endpoint error: {error_trace}")
         raise HTTPException(status_code=500, detail=f"Draft creation failed: {str(e)}")
 
 @app.post("/api/draft/finalize", response_model=FinalDraftResponse)

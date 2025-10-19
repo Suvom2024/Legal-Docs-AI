@@ -50,7 +50,15 @@ class GeminiService:
                 # Try 1: Direct JSON parsing
                 try:
                     result = json.loads(response_text)
-                    return result
+                    # Ensure result is a dictionary
+                    if isinstance(result, dict):
+                        # Ensure alternatives is always a list
+                        if "alternatives" in result and not isinstance(result["alternatives"], list):
+                            result["alternatives"] = []
+                        return result
+                    elif isinstance(result, list):
+                        # Wrap array in object
+                        return {"items": result}
                 except json.JSONDecodeError:
                     pass
                 
@@ -68,7 +76,12 @@ class GeminiService:
                 # Try 3: Try parsing after markdown removal
                 try:
                     result = json.loads(response_text)
-                    return result
+                    if isinstance(result, dict):
+                        if "alternatives" in result and not isinstance(result["alternatives"], list):
+                            result["alternatives"] = []
+                        return result
+                    elif isinstance(result, list):
+                        return {"items": result}
                 except json.JSONDecodeError:
                     pass
                 
@@ -81,7 +94,12 @@ class GeminiService:
                     json_str = response_text[first_brace:last_brace + 1]
                     try:
                         result = json.loads(json_str)
-                        return result
+                        if isinstance(result, dict):
+                            if "alternatives" in result and not isinstance(result["alternatives"], list):
+                                result["alternatives"] = []
+                            return result
+                        elif isinstance(result, list):
+                            return {"items": result}
                     except json.JSONDecodeError:
                         pass
                 
@@ -170,7 +188,23 @@ Return JSON in this exact format:
     
     def classify_template(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """Classify best matching template"""
-        return self._generate_json_response(system_prompt, user_prompt)
+        result = self._generate_json_response(system_prompt, user_prompt)
+        
+        # If result was wrapped in "items" (array response), return the first item or unwrap
+        if isinstance(result, dict):
+            if "items" in result and isinstance(result["items"], list) and len(result["items"]) > 0:
+                # Extract first item if it's the actual classification
+                if isinstance(result["items"][0], dict):
+                    inner = result["items"][0]
+                    if "best_match_id" in inner or "confidence" in inner:
+                        return inner
+            # If it looks like a valid classification already, return it
+            if "best_match_id" in result or "confidence" in result:
+                return result
+        
+        # If we can't find a valid classification structure, return the result as-is
+        # The caller will validate and fallback if needed
+        return result
     
     def generate_questions(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """Generate human-friendly questions"""
