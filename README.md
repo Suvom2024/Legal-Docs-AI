@@ -4,6 +4,16 @@ An AI-powered legal document templating system that converts legal documents int
 
 **Built with:** Python FastAPI + Next.js + Gemini AI + SQLite + Exa.ai (Bonus)
 
+## 📹 Demo Video
+
+**🎥 Watch the full demo (4:39):** [Click here to view on Loom](https://www.loom.com/share/bbe2d2a5093d4cf492eba3b61327bdae?t=284&sid=b0f86d64-9edc-4738-b5c8-420804da696c)
+
+**What's demonstrated:**
+- ✅ Upload & Templatize - Insurance document → extract variables → save template
+- ✅ Chat & Draft - Natural language request → template matched (85% confidence) → Q&A → draft generated
+- ✅ Web Bootstrap (Bonus) - Missing template → Exa.ai search → create from web → continue drafting
+- ✅ Variable Editing & Export - Edit values → regenerate → download DOCX/Markdown
+
 ---
 
 ## 🎯 What This Does
@@ -716,19 +726,6 @@ This exports templates with YAML front-matter, variables as JSON/CSV, and genera
    - Upload a sample document from `backend/sample_documents/`
    - Create a template
    - Go to Chat and draft from the template
-
----
-
-## 📹 Demo Video
-
-**🎥 Watch the full demo here:** [Loom Video (4:39)](https://www.loom.com/share/bbe2d2a5093d4cf492eba3b61327bdae?t=284&sid=b0f86d64-9edc-4738-b5c8-420804da696c)
-
-**What's demonstrated:**
-- ✅ **Upload & Templatize** - Upload insurance document → extract variables → save template
-- ✅ **Chat & Draft** - Natural language request → template matched (85% confidence) → Q&A answered → draft generated (Markdown + DOCX)
-- ✅ **Web Bootstrap** - Request for missing template → Exa.ai search → create template from web → continue drafting
-- ✅ **Variable Editing** - Edit values → regenerate draft
-- ✅ **Export Options** - Download as DOCX (formatted) and Markdown
 
 ---
 
