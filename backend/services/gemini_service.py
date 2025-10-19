@@ -208,7 +208,19 @@ Return JSON in this exact format:
     
     def generate_questions(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """Generate human-friendly questions"""
-        return self._generate_json_response(system_prompt, user_prompt)
+        result = self._generate_json_response(system_prompt, user_prompt)
+        
+        # If result was wrapped in "items" (array response), unwrap it
+        if isinstance(result, dict):
+            if "items" in result and isinstance(result["items"], list):
+                # If items is a list of questions, wrap them properly
+                return {"questions": result["items"]}
+            # If it looks like a valid response already, return it
+            if "questions" in result:
+                return result
+        
+        # If we can't find a valid structure, return empty questions
+        return {"questions": []}
     
     def extract_prefill_values(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """Extract pre-fill values from query"""

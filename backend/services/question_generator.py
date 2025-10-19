@@ -38,10 +38,16 @@ Generate friendly questions. Return JSON:
 
         try:
             result = gemini_service.generate_questions(system_prompt, user_prompt)
-            return result.get("questions", [])
+            questions = result.get("questions", [])
+            print(f"DEBUG: Gemini generated {len(questions)} questions")
+            if len(questions) == 0:
+                print(f"DEBUG: Gemini result: {result}")
+                raise ValueError("Gemini returned empty questions list")
+            return questions
         except Exception as e:
+            print(f"DEBUG: Question generation error: {str(e)}, using fallback")
             # Fallback to simple questions
-            return [
+            fallback_questions = [
                 {
                     "variable_key": var["key"],
                     "question": f"Please provide {var['label'].lower()}",
@@ -49,6 +55,8 @@ Generate friendly questions. Return JSON:
                 }
                 for var in variables
             ]
+            print(f"DEBUG: Generated {len(fallback_questions)} fallback questions")
+            return fallback_questions
     
     @staticmethod
     def extract_values_from_query(
